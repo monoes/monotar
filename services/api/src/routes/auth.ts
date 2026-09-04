@@ -1,8 +1,27 @@
 import type { FastifyInstance } from "fastify";
 import { loadEnv } from "@monotar/config";
 import { generateCodeChallenge, generateCodeVerifier, generateState } from "@monotar/auth";
+import { createHash, randomBytes } from "node:crypto";
+import { prisma } from "../db";
 
 const LOGIN_TXN_COOKIE = "monotar_login_txn";
+
+interface MonoesOAuthResponse {
+  access_token: string;
+  id_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+function decodeIdTokenPayload(idToken: string): { sub: string; email: string } {
+  const [, payload] = idToken.split(".");
+  const json = Buffer.from(payload, "base64url").toString("utf-8");
+  return JSON.parse(json) as { sub: string; email: string };
+}
+
+function hashSessionValue(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/auth/login", async (_request, reply) => {
@@ -29,6 +48,102 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     authorizeUrl.searchParams.set("state", state);
 
     return reply.redirect(authorizeUrl.toString(), 302);
+  });
+
+  app.get("/api/auth/callback/monoes", async (request, reply) => {
+    const env = loadEnv();
+    const query = request.query as { code?: string; state?: string };
+    const txnCookieRaw = request.cookies[LOGIN_TXN_COOKIE];
+
+    if (!txnCookieRaw) {
+      return reply.redirect("/login?error=expired_transaction", 302);
+    }
+
+    reply.clearCookie(LOGIN_TXN_COOKIE, { path: "/" });
+
+    let txn: { state: string; codeVerifier: string };
+    try {
+      txn = JSON.parse(txnCookieRaw);
+    } catch {
+      return reply.redirect("/login?error=expired_transaction", 302);
+    }
+
+    if (!query.state) {
+      return reply.redirect("/login?error=missing_state", 302);
+    }
+    if (query.state !== txn.state) {
+      return reply.redirect("/login?error=invalid_state", 302);
+    }
+    if (!query.code) {
+      return reply.redirect("/login?error=missing_code", 302);
+    }
+
+    const exchangeResponse = await fetch(`${env.monoesIssuer}/oauth2/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code: query.code,
+        redirect_uri: env.monoesRedirectUri,
+        client_id: env.monoesClientId,
+        code_verifier: txn.codeVerifier,
+      }),
+    });
+
+    if (!exchangeResponse.ok) {
+      return reply.redirect("/login?error=token_exchange_failed", 302);
+    }
+
+    const oauthResponse = (await exchangeResponse.json()) as MonoesOAuthResponse;
+    const { sub, email } = decodeIdTokenPayload(oauthResponse.id_token);
+
+    const existingIdentity = await prisma.externalIdentity.findUnique({
+      where: { provider_providerSubject: { provider: "monoes", providerSubject: sub } },
+      include: { user: true },
+    });
+
+    let userId: string;
+    if (existingIdentity) {
+      userId = existingIdentity.userId;
+      await prisma.user.update({
+        where: { id: userId },
+        data: { email, lastLoginAt: new Date() },
+      });
+    } else {
+      const user = await prisma.user.create({
+        data: { email, lastLoginAt: new Date() },
+      });
+      userId = user.id;
+      await prisma.externalIdentity.create({
+        data: { userId, provider: "monoes", providerSubject: sub, email },
+      });
+      const org = await prisma.organization.create({
+        data: { name: `${email}'s Organization` },
+      });
+      await prisma.organizationMember.create({
+        data: { organizationId: org.id, userId, role: "OWNER" },
+      });
+    }
+
+    const sessionValue = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+    await prisma.session.create({
+      data: {
+        userId,
+        sessionTokenHash: hashSessionValue(sessionValue),
+        expiresAt,
+      },
+    });
+
+    reply.setCookie(env.sessionCookieName, sessionValue, {
+      httpOnly: true,
+      secure: env.nodeEnv === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: expiresAt,
+    });
+
+    return reply.redirect("/dashboard", 302);
   });
 }
 
