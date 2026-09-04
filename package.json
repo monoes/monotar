@@ -10,7 +10,8 @@
     "typecheck": "pnpm -r --if-present run typecheck",
     "build": "pnpm -r --if-present run build",
     "monoes:register": "tsx scripts/register-monoes-client.ts",
-    "monoes:check": "tsx scripts/check-monoes-oauth.ts"
+    "monoes:check": "tsx scripts/check-monoes-oauth.ts",
+    "security:scan-bundle": "tsx scripts/scan-bundle-for-secrets.ts"
   },
   "devDependencies": {
     "eslint": "^9.13.0",
