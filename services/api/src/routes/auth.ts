@@ -56,7 +56,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const txnCookieRaw = request.cookies[LOGIN_TXN_COOKIE];
 
     if (!txnCookieRaw) {
-      return reply.redirect("/login?error=expired_transaction", 302);
+      return reply.redirect(`${env.appUrl}/login?error=expired_transaction`, 302);
     }
 
     reply.clearCookie(LOGIN_TXN_COOKIE, { path: "/" });
@@ -65,17 +65,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     try {
       txn = JSON.parse(txnCookieRaw);
     } catch {
-      return reply.redirect("/login?error=expired_transaction", 302);
+      return reply.redirect(`${env.appUrl}/login?error=expired_transaction`, 302);
     }
 
     if (!query.state) {
-      return reply.redirect("/login?error=missing_state", 302);
+      return reply.redirect(`${env.appUrl}/login?error=missing_state`, 302);
     }
     if (query.state !== txn.state) {
-      return reply.redirect("/login?error=invalid_state", 302);
+      return reply.redirect(`${env.appUrl}/login?error=invalid_state`, 302);
     }
     if (!query.code) {
-      return reply.redirect("/login?error=missing_code", 302);
+      return reply.redirect(`${env.appUrl}/login?error=missing_code`, 302);
     }
 
     const exchangeResponse = await fetch(`${env.monoesIssuer}/oauth2/token`, {
@@ -91,7 +91,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     });
 
     if (!exchangeResponse.ok) {
-      return reply.redirect("/login?error=token_exchange_failed", 302);
+      return reply.redirect(`${env.appUrl}/login?error=token_exchange_failed`, 302);
     }
 
     const oauthResponse = (await exchangeResponse.json()) as MonoesOAuthResponse;
@@ -143,7 +143,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       expires: expiresAt,
     });
 
-    return reply.redirect("/dashboard", 302);
+    return reply.redirect(`${env.appUrl}/dashboard`, 302);
   });
 
   app.get("/api/auth/session", async (request) => {

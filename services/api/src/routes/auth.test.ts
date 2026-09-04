@@ -75,7 +75,7 @@ describe("GET /api/auth/callback/monoes", () => {
     });
 
     expect(callbackResponse.statusCode).toBe(302);
-    expect(callbackResponse.headers.location).toBe("/dashboard");
+    expect(callbackResponse.headers.location).toBe("http://localhost:3000/dashboard");
     expect(callbackResponse.cookies.find((c) => c.name === "monotar_session")).toBeDefined();
 
     const user = await prisma.user.findFirst({ where: { email: "user@example.com" } });
@@ -96,7 +96,7 @@ describe("GET /api/auth/callback/monoes", () => {
     });
 
     expect(response.statusCode).toBe(302);
-    expect(response.headers.location).toBe("/login?error=invalid_state");
+    expect(response.headers.location).toBe("http://localhost:3000/login?error=invalid_state");
   });
 
   it("rejects a missing authorization code", async () => {
@@ -112,7 +112,7 @@ describe("GET /api/auth/callback/monoes", () => {
     });
 
     expect(response.statusCode).toBe(302);
-    expect(response.headers.location).toBe("/login?error=missing_code");
+    expect(response.headers.location).toBe("http://localhost:3000/login?error=missing_code");
   });
 
   it("rejects a missing login transaction cookie (expired/reused)", async () => {
@@ -123,6 +123,6 @@ describe("GET /api/auth/callback/monoes", () => {
     });
 
     expect(response.statusCode).toBe(302);
-    expect(response.headers.location).toBe("/login?error=expired_transaction");
+    expect(response.headers.location).toBe("http://localhost:3000/login?error=expired_transaction");
   });
 });
