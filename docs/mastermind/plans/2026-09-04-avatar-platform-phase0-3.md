@@ -289,18 +289,24 @@ S3_ACCESS_KEY=monotar
 S3_SECRET_KEY=changeme-local-dev-only
 S3_BUCKET=avatar-assets
 
-APP_URL=http://localhost:3000
+APP_URL=http://127.0.0.1:3000
 API_PORT=4000
 
 MONOES_ISSUER=https://monoes.me/api/auth
 MONOES_METADATA_URL=https://monoes.me/api/auth/.well-known/oauth-authorization-server
 MONOES_CLIENT_ID=
 MONOES_SCOPES=openid profile email
-MONOES_REDIRECT_URI=http://localhost:3000/api/auth/callback/monoes
+MONOES_REDIRECT_URI=http://127.0.0.1:3000/api/auth/callback/monoes
 
 SESSION_COOKIE_NAME=monotar_session
 NODE_ENV=development
 ```
+
+Note: MonoES requires the literal host `127.0.0.1`, not the hostname `localhost`, to
+treat an `http://` redirect URI as loopback — registering with `localhost` fails with
+`invalid_redirect_uri`. `APP_URL`/`MONOES_REDIRECT_URI` above use `127.0.0.1`
+accordingly, and both dev servers must be accessed at `http://127.0.0.1:3000` (not
+`localhost:3000`) for the OAuth redirect to match exactly.
 
 Each developer copies this to `.env.local` and picks their own local-only Postgres/MinIO
 dev password (it only ever protects a container bound to localhost); `MONOES_CLIENT_ID`
@@ -1927,7 +1933,9 @@ git commit -m "feat(api): add session plugin, /session, /me, /logout"
 
 ```ts
 #!/usr/bin/env tsx
-const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+// MonoES requires 127.0.0.1, not the "localhost" hostname, to recognize a
+// redirect URI as loopback and allow http:// for it (see application_type below).
+const appUrl = process.env.APP_URL ?? "http://127.0.0.1:3000";
 const registrationEndpoint = "https://monoes.me/api/auth/oauth2/register";
 const redirectUri = `${appUrl}/api/auth/callback/monoes`;
 
@@ -1939,11 +1947,16 @@ async function main() {
       redirect_uris: [redirectUri],
       token_endpoint_auth_method: "none",
       grant_types: ["authorization_code", "refresh_token"],
+      // Without this, MonoES rejects http:// loopback redirect URIs outright
+      // (its default "web" client type requires https, even for localhost).
+      application_type: "native",
     }),
   });
 
   if (!response.ok) {
+    const body = await response.text();
     console.error(`Registration failed: HTTP ${response.status}`);
+    console.error(body);
     process.exit(1);
   }
 
@@ -1958,6 +1971,14 @@ main().catch((err) => {
   process.exit(1);
 });
 ```
+
+Verified live against the real MonoES registration endpoint: registering with
+`redirect_uris: ["http://localhost:3000/..."]` (no `application_type`) fails with
+`{"error":"invalid_redirect_uri","error_description":"web clients require https
+redirect URIs on non-loopback hosts: ..."}` even though the host looks like loopback
+— MonoES only recognizes the literal `127.0.0.1` address, not the `localhost` name, and
+only exempts `http://` for clients explicitly registered with `application_type:
+"native"`. Both fixes are required together; either one alone still fails.
 
 - [ ] **Step 2: Write `scripts/check-monoes-oauth.ts`**
 

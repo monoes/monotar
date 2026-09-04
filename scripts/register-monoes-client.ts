@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
-const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+// MonoES requires 127.0.0.1, not the "localhost" hostname, to recognize a
+// redirect URI as loopback and allow http:// for it (see application_type below).
+const appUrl = process.env.APP_URL ?? "http://127.0.0.1:3000";
 const registrationEndpoint = "https://monoes.me/api/auth/oauth2/register";
 const redirectUri = `${appUrl}/api/auth/callback/monoes`;
 
@@ -11,11 +13,16 @@ async function main() {
       redirect_uris: [redirectUri],
       token_endpoint_auth_method: "none",
       grant_types: ["authorization_code", "refresh_token"],
+      // Without this, MonoES rejects http:// loopback redirect URIs outright
+      // (its default "web" client type requires https, even for localhost).
+      application_type: "native",
     }),
   });
 
   if (!response.ok) {
+    const body = await response.text();
     console.error(`Registration failed: HTTP ${response.status}`);
+    console.error(body);
     process.exit(1);
   }
 
