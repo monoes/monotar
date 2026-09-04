@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import { healthRoutes } from "./routes/health";
 import { authRoutes } from "./routes/auth";
+import { avatarAgentRoutes } from "./routes/avatar-agents";
 import { sessionPlugin } from "./plugins/session";
 
 export function buildApp(): FastifyInstance {
@@ -10,5 +11,6 @@ export function buildApp(): FastifyInstance {
   app.register(sessionPlugin);
   app.register(healthRoutes);
   app.register(authRoutes);
+  app.register(avatarAgentRoutes);
   return app;
 }
