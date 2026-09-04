@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "fastify": "^5.1.0",
+    "@fastify/cookie": "^11.0.1",
     "@monotar/config": "workspace:*",
     "@monotar/contracts": "workspace:*",
     "@monotar/auth": "workspace:*",
