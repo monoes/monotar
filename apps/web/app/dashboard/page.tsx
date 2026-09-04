@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import type { MeResponse } from "@monotar/contracts";
+import { AvatarAgentsClient } from "./avatar-agents-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -23,6 +24,7 @@ export default async function DashboardPage() {
     <main>
       <h1>Dashboard</h1>
       <p>Signed in as {me.email}</p>
+      <AvatarAgentsClient />
     </main>
   );
 }
