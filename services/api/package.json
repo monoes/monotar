@@ -1,0 +1,22 @@
+{
+  "name": "@monotar/api",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fastify": "^5.1.0",
+    "@monotar/config": "workspace:*",
+    "@monotar/contracts": "workspace:*",
+    "@monotar/auth": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1",
+    "vitest": "^2.1.4",
+    "typescript": "^5.6.3"
+  }
+}
