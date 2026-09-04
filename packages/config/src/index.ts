@@ -1,1 +1,2 @@
-export const CONFIG_PACKAGE_VERSION = "0.1.0";
+export { loadEnv } from "./env";
+export type { Env } from "./env";
