@@ -107,6 +107,9 @@ importers:
       fastify:
         specifier: ^5.1.0
         version: 5.12.3
+      fastify-plugin:
+        specifier: ^5.0.1
+        version: 5.1.0
     devDependencies:
       prisma:
         specifier: ^5.21.1
@@ -1290,6 +1293,9 @@ packages:
 
   fast-uri@4.1.4:
     resolution: {integrity: sha512-dODXrIxlS9JSdgAnhIUKOosKV1oMtU2VtVw87QRaHzyl5jxO290Ii5tEZfCfzfWNHi3jKWwBSdQj0qIyshdZdQ==}
+
+  fastify-plugin@5.1.0:
+    resolution: {integrity: sha512-FAIDA8eovSt5qcDgcBvDuX/v0Cjz0ohGhENZ/wpc3y+oZCY2afZ9Baqql3g/lC+OHRnciQol4ww7tuthOb9idw==}
 
   fastify-plugin@6.0.0:
     resolution: {integrity: sha512-fZOty7z3O7vOliF6d8bHE3wiEh1KcNnKEQensSgTk9C1DvN6nRLS++XVd86v33Hw/8u9Un8A1zDrQ8ujcQDHEg==}
@@ -2990,6 +2996,8 @@ snapshots:
   fast-uri@3.1.7: {}
 
   fast-uri@4.1.4: {}
+
+  fastify-plugin@5.1.0: {}
 
   fastify-plugin@6.0.0: {}
 

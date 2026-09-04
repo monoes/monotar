@@ -145,6 +145,38 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.redirect("/dashboard", 302);
   });
+
+  app.get("/api/auth/session", async (request) => {
+    return { authenticated: request.currentUser !== null };
+  });
+
+  app.get("/api/auth/me", async (request, reply) => {
+    if (!request.currentUser) {
+      return reply.code(401).send({ error: "unauthenticated" });
+    }
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: request.currentUser.id } });
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      organizationId: request.currentUser.organizationId,
+      role: request.currentUser.role,
+    };
+  });
+
+  app.post("/api/auth/logout", async (request, reply) => {
+    const env = loadEnv();
+    const sessionValue = request.cookies[env.sessionCookieName];
+    if (sessionValue) {
+      await prisma.session.updateMany({
+        where: { sessionTokenHash: hashSessionValue(sessionValue) },
+        data: { revokedAt: new Date() },
+      });
+    }
+    reply.clearCookie(env.sessionCookieName, { path: "/" });
+    return { success: true };
+  });
 }
 
 export const LOGIN_TXN_COOKIE_NAME = LOGIN_TXN_COOKIE;
