@@ -57,7 +57,9 @@ describe("WS /api/realtime/:agentId", () => {
     ws.send(JSON.stringify({ type: "audio_chunk", data: "ZmFrZS1hdWRpbw==" }));
     const messages = await turnMessages;
 
-    const states = messages.filter((m) => m.type === "state").map((m: any) => m.state);
+    const states = messages
+      .filter((m): m is Extract<ServerMessage, { type: "state" }> => m.type === "state")
+      .map((m) => m.state);
     expect(states).toEqual(["USER_SPEAKING", "THINKING", "AI_SPEAKING", "LISTENING"]);
     expect(messages.some((m) => m.type === "transcript")).toBe(true);
     expect(messages.some((m) => m.type === "assistant_text")).toBe(true);

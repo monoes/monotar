@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@prisma/client";
 import { CreateAvatarAgentSchema, UpdateAvatarAgentSchema } from "@monotar/contracts";
 import { prisma } from "../db";
 import { requireRole } from "../rbac";
@@ -31,7 +32,9 @@ export async function avatarAgentRoutes(app: FastifyInstance): Promise<void> {
     }
     const input = CreateAvatarAgentSchema.parse(request.body);
     const orgId = request.currentUser!.organizationId;
-    const agent = await prisma.avatarAgent.create({ data: { ...input, organizationId: orgId } });
+    const agent = await prisma.avatarAgent.create({
+      data: { ...input, organizationId: orgId } as Prisma.AvatarAgentUncheckedCreateInput,
+    });
     return reply.code(201).send(agent);
   });
 
@@ -44,7 +47,10 @@ export async function avatarAgentRoutes(app: FastifyInstance): Promise<void> {
     const existing = await prisma.avatarAgent.findFirst({ where: { id, organizationId: orgId } });
     if (!existing) return reply.code(404).send({ error: "not_found" });
     const input = UpdateAvatarAgentSchema.parse(request.body);
-    return prisma.avatarAgent.update({ where: { id }, data: input });
+    return prisma.avatarAgent.update({
+      where: { id },
+      data: input as Prisma.AvatarAgentUncheckedUpdateInput,
+    });
   });
 
   app.delete("/api/avatar-agents/:id", async (request, reply) => {

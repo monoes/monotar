@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.18.1",
   "scripts": {
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "pnpm -r --workspace-concurrency=1 run test",
     "typecheck": "pnpm -r --if-present run typecheck",
     "build": "pnpm -r --if-present run build",
     "monoes:register": "tsx scripts/register-monoes-client.ts",

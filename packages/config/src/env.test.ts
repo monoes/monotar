@@ -27,7 +27,7 @@ describe("loadEnv", () => {
   });
 
   it("throws when a required field is missing", () => {
-    const { DATABASE_URL, ...rest } = validSource;
+    const { DATABASE_URL: _DATABASE_URL, ...rest } = validSource;
     expect(() => loadEnv(rest)).toThrow(/DATABASE_URL/);
   });
 });
