@@ -3256,15 +3256,25 @@ git commit -m "feat(api): add WebSocket realtime route wiring mock conversation 
 ```tsx
 import { TalkClient } from "./talk-client";
 
-export default function TalkPage({ params }: { params: { agentId: string } }) {
+export default async function TalkPage({
+  params,
+}: {
+  params: Promise<{ agentId: string }>;
+}) {
+  const { agentId } = await params;
   return (
     <main>
       <h1>Talk</h1>
-      <TalkClient agentId={params.agentId} />
+      <TalkClient agentId={agentId} />
     </main>
   );
 }
 ```
+
+Note: Next.js 15 (resolved by the `^15.0.2` range in Task 13) made `params`/`searchParams`
+async `Promise` props on page components — this differs from Next.js 14 and earlier.
+`apps/web/app/login/page.tsx` (Task 13) already uses the same `Promise`-based pattern for
+`searchParams`; follow it here too, or `next build` will fail type-checking.
 
 - [ ] **Step 2: Write the client component**
 
