@@ -1,0 +1,9 @@
+{"routeId":"dd07efe9-8a8a-4bdf-81ed-804f04be199d","ts":1788518792183,"task":"do all","recommendedAgent":"coder","routingMethod":"keyword","confidence":0.5,"learningMode":"js","agentActuallyUsed":"coder","measuredSuccess":true}
+{"routeId":"a115bd28-9b9a-4e36-8d1c-3d6931382ec4","ts":1788519265812,"task":"/mastermind:master there are two auth and spec thats the app i wanna build go ahead and make it you can use multi agent to be quicker too","recommendedAgent":"Tester","routingMethod":"keyword","confidence":0.87,"learningMode":"js"}
+{"routeId":"92a57c10-44cb-449a-b381-f1fd201f1cbe","ts":1788524554400,"task":"it broke last session continue","recommendedAgent":"coder","routingMethod":"keyword","confidence":0.5,"learningMode":"js"}
+{"routeId":"65efe3b1-1490-4da0-bb27-90e98227e983","ts":1788525308971,"task":"how can i give you passwordless sudo","recommendedAgent":"coder","routingMethod":"keyword","confidence":0.5,"learningMode":"js"}
+{"routeId":"4b5d3987-9480-488e-8a13-1da62b008f03","ts":1788525420706,"task":"should i change monoes-install with my username or just monoes part","recommendedAgent":"coder","routingMethod":"keyword","confidence":0.5,"learningMode":"js"}
+{"routeId":"1db81ba8-1236-443a-8933-f145dcceb741","ts":1788525524592,"task":"i did option A","recommendedAgent":"coder","routingMethod":"keyword","confidence":0.5,"learningMode":"js"}
+{"routeId":"cc1c784a-713d-4b07-ac0e-27b97aa9d9af","ts":1788527013276,"task":"i did","recommendedAgent":"coder","routingMethod":"keyword","confidence":0.5,"learningMode":"js"}
+{"routeId":"61bdd7e5-0a9d-4764-9608-904ec7076af3","ts":1788527047854,"task":"i confirm go ahead","recommendedAgent":"coder","routingMethod":"keyword","confidence":0.5,"learningMode":"js"}
+{"routeId":"520ae927-a3be-4b24-92a0-e671abf4d947","ts":1788529003565,"task":"1 spawn as many agent possible to make it faster","recommendedAgent":"coder","routingMethod":"keyword","confidence":0.5,"learningMode":"js"}

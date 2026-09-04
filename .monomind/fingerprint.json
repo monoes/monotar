@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "root": "/home/monoes/Desktop/monoes/repos/monotar",
+  "totalFiles": 2,
+  "git": false,
+  "scannedAt": "2026-09-04T10:25:43.882Z",
+  "capabilities": {
+    "code": {
+      "confidence": 0,
+      "files": 0,
+      "signals": []
+    },
+    "documents": {
+      "confidence": 0,
+      "files": 0,
+      "signals": []
+    },
+    "media": {
+      "confidence": 0,
+      "files": 0,
+      "signals": []
+    },
+    "data": {
+      "confidence": 0,
+      "files": 0,
+      "signals": []
+    },
+    "graph": {
+      "confidence": 0,
+      "files": 0,
+      "signals": []
+    },
+    "timeline": {
+      "confidence": 0,
+      "files": 0,
+      "signals": []
+    }
+  },
+  "filesByExtension": {
+    "": 2
+  }
+}

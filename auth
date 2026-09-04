@@ -1,0 +1,761 @@
+# REPLACEMENT AUTHENTICATION SPEC — MONOES.ME
+
+Authentication for this application MUST use MonoES OAuth 2.0.
+
+Do not implement a separate password database.
+
+Do not introduce Auth0, Clerk, Firebase Auth, Cognito, Keycloak, Supabase Auth, or another primary identity provider.
+
+MonoES is the identity authority.
+
+---
+
+# 1. MONOES AUTHORIZATION SERVER
+
+Use the following issuer:
+
+```text
+https://monoes.me/api/auth
+```
+
+OAuth Authorization Server Metadata:
+
+```text
+GET https://monoes.me/api/auth/.well-known/oauth-authorization-server
+```
+
+At application startup, fetch and validate the authorization-server metadata where practical.
+
+Do not hard-code metadata values that can be obtained through discovery.
+
+The known documented endpoints are:
+
+```text
+Client registration:
+POST https://monoes.me/api/auth/oauth2/register
+
+Authorization:
+GET https://monoes.me/api/auth/oauth2/authorize
+
+Token:
+POST https://monoes.me/api/auth/oauth2/token
+```
+
+---
+
+# 2. OAUTH CLIENT REGISTRATION
+
+MonoES supports OAuth 2.0 Dynamic Client Registration.
+
+For development/setup, register the application with:
+
+```bash
+curl -X POST https://monoes.me/api/auth/oauth2/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "redirect_uris": [
+      "http://localhost:3000/api/auth/callback/monoes"
+    ],
+    "token_endpoint_auth_method": "none",
+    "grant_types": [
+      "authorization_code",
+      "refresh_token"
+    ]
+  }'
+```
+
+Store the returned:
+
+```text
+client_id
+```
+
+in environment configuration.
+
+Do NOT assume a client secret exists.
+
+The documented client configuration uses:
+
+```text
+token_endpoint_auth_method = none
+```
+
+Therefore implement Authorization Code + PKCE as the primary browser login mechanism.
+
+For production registration use the real HTTPS callback URL.
+
+Example:
+
+```text
+https://app.example.com/api/auth/callback/monoes
+```
+
+Never register wildcard redirect URIs.
+
+---
+
+# 3. ENVIRONMENT VARIABLES
+
+Use:
+
+```env
+MONOES_ISSUER=https://monoes.me/api/auth
+
+MONOES_CLIENT_ID=
+
+MONOES_AUTHORIZATION_URL=https://monoes.me/api/auth/oauth2/authorize
+MONOES_TOKEN_URL=https://monoes.me/api/auth/oauth2/token
+
+MONOES_METADATA_URL=https://monoes.me/api/auth/.well-known/oauth-authorization-server
+
+MONOES_SCOPES="openid profile email"
+
+MONOES_REDIRECT_URI=http://localhost:3000/api/auth/callback/monoes
+```
+
+Do not require:
+
+```env
+MONOES_CLIENT_SECRET
+```
+
+unless future MonoES configuration explicitly introduces a confidential-client authentication method.
+
+Prefer values discovered from RFC 8414 metadata over duplicated environment configuration when possible.
+
+---
+
+# 4. LOGIN FLOW
+
+Implement OAuth 2.0 Authorization Code Flow with PKCE.
+
+When:
+
+```text
+GET /api/auth/login
+```
+
+is called:
+
+Generate cryptographically secure:
+
+```text
+state
+code_verifier
+code_challenge
+```
+
+Use:
+
+```text
+code_challenge_method=S256
+```
+
+Store state and verifier temporarily in a secure HttpOnly login transaction cookie or equivalent server-side transaction state.
+
+Generate authorization URL conceptually as:
+
+```text
+https://monoes.me/api/auth/oauth2/authorize
+  ?client_id=<MONOES_CLIENT_ID>
+  &redirect_uri=<MONOES_REDIRECT_URI>
+  &response_type=code
+  &scope=openid+profile+email
+  &code_challenge=<CODE_CHALLENGE>
+  &code_challenge_method=S256
+  &state=<STATE>
+```
+
+Redirect the browser there.
+
+Do not use OAuth implicit flow.
+
+---
+
+# 5. CALLBACK
+
+Implement:
+
+```text
+GET /api/auth/callback/monoes
+```
+
+Read:
+
+```text
+code
+state
+```
+
+Verify returned state exactly matches the login transaction.
+
+Reject:
+
+```text
+missing state
+incorrect state
+missing authorization code
+expired login transaction
+reused transaction
+```
+
+Then exchange the authorization code against:
+
+```text
+POST https://monoes.me/api/auth/oauth2/token
+```
+
+Use:
+
+```text
+Content-Type: application/x-www-form-urlencoded
+```
+
+Submit:
+
+```text
+grant_type=authorization_code
+code=<authorization code>
+redirect_uri=<configured redirect URI>
+client_id=<MonoES client ID>
+code_verifier=<original PKCE verifier>
+```
+
+Do not send a fabricated client secret.
+
+---
+
+# 6. SCOPES
+
+For authentication into our avatar application, initially request:
+
+```text
+openid
+profile
+email
+```
+
+Do NOT request:
+
+```text
+community:read
+community:write
+```
+
+unless the avatar product genuinely needs access to the MonoES Community API.
+
+Use least privilege.
+
+MonoES documents the following scope classes:
+
+```text
+openid
+profile
+email
+
+community:read
+community:write
+
+offline_access
+```
+
+`community:write` does NOT imply `community:read`.
+
+Never assume scope inheritance.
+
+---
+
+# 7. REFRESH TOKENS
+
+Do NOT request `offline_access` for the initial MVP unless persistent provider access is actually required.
+
+If long-lived MonoES API access becomes necessary, add:
+
+```text
+offline_access
+```
+
+to the authorization scope.
+
+MonoES only returns a refresh token when `offline_access` is explicitly requested.
+
+Registering:
+
+```text
+grant_types = ["authorization_code", "refresh_token"]
+```
+
+alone is NOT enough to obtain one.
+
+If refresh tokens are enabled:
+
+- encrypt them at rest;
+- never expose them to browser JavaScript;
+- rotate/revoke local sessions appropriately;
+- avoid logging them.
+
+---
+
+# 8. ACCESS TOKEN PURPOSE
+
+Treat a MonoES access token as an authorization credential for MonoES resources.
+
+Do NOT use the raw MonoES access token as our application's long-lived browser session.
+
+After successful login:
+
+1. validate the MonoES OAuth response;
+2. resolve the user's external identity;
+3. create/update the local User;
+4. create our own application session;
+5. issue a secure HttpOnly application-session cookie.
+
+This keeps MonoES authentication separate from our platform session lifecycle.
+
+---
+
+# 9. USER IDENTITY
+
+Use the stable provider identity supplied by MonoES/OIDC rather than email whenever available.
+
+Create:
+
+```text
+ExternalIdentity
+
+id
+userId
+provider
+providerSubject
+email
+profileMetadata
+createdAt
+updatedAt
+```
+
+Set:
+
+```text
+provider = "monoes"
+```
+
+Use the stable OAuth/OIDC subject identifier as:
+
+```text
+providerSubject
+```
+
+Unique constraint:
+
+```text
+(provider, providerSubject)
+```
+
+Email is profile data.
+
+Do NOT use email as the primary external identity key.
+
+---
+
+# 10. LOCAL USER
+
+Create:
+
+```text
+User
+
+id
+email
+displayName
+avatarUrl
+createdAt
+updatedAt
+lastLoginAt
+```
+
+On first login:
+
+1. exchange authorization code;
+2. obtain/validate identity;
+3. create User;
+4. create ExternalIdentity;
+5. create default Organization;
+6. create OWNER OrganizationMember;
+7. create application Session;
+8. redirect to `/dashboard`.
+
+On subsequent login:
+
+1. locate ExternalIdentity by provider + providerSubject;
+2. update safe profile attributes;
+3. update lastLoginAt;
+4. create/rotate application Session;
+5. redirect to `/dashboard`.
+
+Never create duplicate users just because the user's email changed.
+
+---
+
+# 11. APPLICATION SESSION
+
+Create:
+
+```text
+Session
+
+id
+userId
+sessionTokenHash
+createdAt
+expiresAt
+lastSeenAt
+revokedAt
+userAgent
+ipHash
+```
+
+Send only an opaque session token to the browser.
+
+Store a hash of the token in PostgreSQL.
+
+Production cookie:
+
+```text
+HttpOnly=true
+Secure=true
+SameSite=Lax
+Path=/
+```
+
+Development may allow:
+
+```text
+Secure=false
+```
+
+only when running over localhost HTTP.
+
+Never store the session token in:
+
+```text
+localStorage
+sessionStorage
+```
+
+---
+
+# 12. AUTH API
+
+Implement:
+
+```text
+GET  /api/auth/login
+GET  /api/auth/callback/monoes
+POST /api/auth/logout
+GET  /api/auth/session
+GET  /api/auth/me
+```
+
+Optional developer endpoint:
+
+```text
+GET /api/auth/debug
+```
+
+must only exist in development mode and must never expose tokens or secrets.
+
+---
+
+# 13. LOGOUT
+
+Application logout must:
+
+1. revoke/delete the local application session;
+2. expire the browser cookie;
+3. redirect to an appropriate logged-out page.
+
+If MonoES metadata exposes a standardized provider logout endpoint, support provider logout separately.
+
+Do not invent one.
+
+---
+
+# 14. DYNAMIC CLIENT REGISTRATION SCRIPT
+
+Create:
+
+```text
+scripts/register-monoes-client.ts
+```
+
+or equivalent.
+
+Usage:
+
+```bash
+pnpm monoes:register
+```
+
+It should read:
+
+```env
+APP_URL
+```
+
+and generate an appropriate redirect URI.
+
+For local development:
+
+```text
+http://localhost:3000/api/auth/callback/monoes
+```
+
+Payload:
+
+```json
+{
+  "redirect_uris": [
+    "<callback>"
+  ],
+  "token_endpoint_auth_method": "none",
+  "grant_types": [
+    "authorization_code",
+    "refresh_token"
+  ]
+}
+```
+
+Print the returned client ID.
+
+Never write secrets automatically into committed files.
+
+Optionally update `.env.local` only after explicit developer opt-in.
+
+---
+
+# 15. MONOES DISCOVERY CHECK
+
+Create:
+
+```text
+scripts/check-monoes-oauth.ts
+```
+
+Verify:
+
+```text
+https://monoes.me/api/auth/.well-known/oauth-authorization-server
+```
+
+Validate expected issuer:
+
+```text
+https://monoes.me/api/auth
+```
+
+Validate discovered authorization and token endpoints.
+
+If discovered metadata differs from configured endpoints:
+
+fail in production.
+
+Warn clearly in development.
+
+---
+
+# 16. COMMUNITY API ACCESS
+
+Authentication into this avatar application does NOT automatically imply the application should use MonoES community functionality.
+
+Only request:
+
+```text
+community:read
+```
+
+if a feature needs authenticated MonoES GET endpoints.
+
+Only request:
+
+```text
+community:write
+```
+
+if a feature genuinely needs POST/PATCH/DELETE actions against MonoES.
+
+If both are needed, request both.
+
+Do not assume:
+
+```text
+community:write
+```
+
+implies:
+
+```text
+community:read
+```
+
+---
+
+# 17. OPTIONAL MONOES INTEGRATION LATER
+
+Design authorization so additional MonoES functionality can be added later without changing login architecture.
+
+Possible future integration:
+
+```text
+MonoESOAuthProvider
+        │
+        ├── Authentication
+        │
+        └── MonoES API access
+```
+
+Separate identity authentication from business API authorization.
+
+---
+
+# 18. HEADLESS AGENT FLOW
+
+MonoES also supports a headless-agent authentication flow.
+
+Do NOT use this for normal user browser login.
+
+Reserve it for future server/agent use cases.
+
+Documented workflow:
+
+```text
+POST /api/auth/agent/claim
+
+POST /api/auth/agent/claim/verify
+```
+
+The first request accepts:
+
+```json
+{
+  "email": "...",
+  "client_id": "...",
+  "scope": "..."
+}
+```
+
+The user receives a six-digit code by email.
+
+Verification accepts:
+
+```json
+{
+  "email": "...",
+  "code": "...",
+  "client_id": "..."
+}
+```
+
+Successful verification returns an access token.
+
+Do not implement this in the initial MVP unless there is a concrete agent use case requiring browserless authentication.
+
+---
+
+# 19. HEADLESS SECURITY CHARACTERISTICS
+
+If implemented later, account for documented MonoES behavior:
+
+- codes expire after 10 minutes;
+- codes permit at most 5 attempts;
+- claim requests are limited to 3 outstanding requests per email per hour;
+- account lookup does not disclose whether an email exists;
+- resulting token behaves like a normal OAuth-issued bearer token.
+
+Do not weaken these protections in our UI.
+
+---
+
+# 20. AUTH TESTS
+
+Unit/integration tests must cover:
+
+```text
+PKCE verifier generation
+S256 challenge generation
+OAuth state generation
+OAuth state verification
+
+successful callback
+
+missing code
+missing state
+wrong state
+expired login transaction
+reused login transaction
+
+token endpoint errors
+
+new-user creation
+returning-user login
+changed email
+local session creation
+local session expiration
+logout
+RBAC
+tenant isolation
+```
+
+Use a mock MonoES authorization server in CI.
+
+---
+
+# 21. SECURITY TEST
+
+Verify the frontend bundle contains none of:
+
+```text
+access_token
+refresh_token values
+session database hashes
+encryption keys
+authorization headers
+```
+
+Do not log OAuth token responses.
+
+Redact:
+
+```text
+authorization
+cookie
+set-cookie
+access_token
+refresh_token
+```
+
+from structured logs.
+
+---
+
+# 22. FIRST AUTHENTICATION ACCEPTANCE CRITERION
+
+Authentication phase is DONE when:
+
+1. `pnpm monoes:register` can register a development OAuth client.
+2. `MONOES_CLIENT_ID` can be configured.
+3. User visits `/login`.
+4. User clicks "Continue with MonoES".
+5. Browser redirects to MonoES.
+6. User authenticates/approves access.
+7. MonoES redirects to our callback.
+8. PKCE authorization code exchange succeeds.
+9. Platform resolves the user's MonoES identity.
+10. Local user/account is created.
+11. Local organization is created on first login.
+12. Local HttpOnly session is established.
+13. User lands on `/dashboard`.
+14. Protected routes reject unauthenticated sessions.
+15. Logout removes the local session.
+16. No password is ever handled by our avatar platform.
+
+Do not mark Phase 1 complete until this has been tested against the real MonoES authorization server at least once outside CI.
