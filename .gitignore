@@ -9,3 +9,4 @@ __pycache__/
 *.log
 .turbo/
 coverage/
+services/stt/src/stt_service/generated/
