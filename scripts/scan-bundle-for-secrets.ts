@@ -2,11 +2,16 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const FORBIDDEN_FIELD_NAMES = [
-  "access_token",
-  "refresh_token",
-  "sessionTokenHash",
-];
+// "access_token"/"refresh_token" were dropped from this list: they're generic
+// OAuth vocabulary that any OAuth-capable third-party library can legitimately
+// reference internally (e.g. livekit-client uses "access_token" as its own
+// WebSocket query param name for LiveKit's intentionally client-side room-access
+// JWT, and redacts it in its own logs — verified this isn't our MonoES token or
+// session leaking). Our own MonoES OAuth code lives entirely in services/api,
+// which apps/web's client bundle never imports, so those terms never reliably
+// indicated a real leak path here in the first place. sessionTokenHash is kept:
+// it's a Prisma field name unique to our schema, not shared OAuth vocabulary.
+const FORBIDDEN_FIELD_NAMES = ["sessionTokenHash"];
 
 const BUNDLE_DIR = join(process.cwd(), "apps/web/.next/static");
 

@@ -1,5 +1,12 @@
 name: CI
 
+# NOTE: this workflow covers unit/contract tests only. It does not run real
+# LiveKit media, real STT/LLM/TTS against live services, or real LiveTalking/
+# Wav2Lip avatar rendering — those need real model weights, PyTorch, and (for
+# MuseTalk) CUDA hardware this CI runner doesn't have. See "Post-Plan Manual
+# Verification" in docs/mastermind/plans/2026-09-05-avatar-platform-phase4-9.md
+# for the real end-to-end check.
+
 on:
   push:
   pull_request:
@@ -38,3 +45,12 @@ jobs:
       - run: pnpm test
       - run: pnpm --filter @monotar/web build
       - run: pnpm security:scan-bundle
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          cd services/stt
+          pip install -r requirements.txt
+          pip install grpcio-tools
+          ./scripts/gen_proto.sh
+          python -m pytest -v

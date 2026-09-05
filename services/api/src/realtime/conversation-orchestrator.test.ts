@@ -30,7 +30,9 @@ describe("ConversationOrchestrator", () => {
     await vi.advanceTimersByTimeAsync(20);
     await vi.waitFor(() => expect(orchestrator.state).toBe("LISTENING"));
 
-    const states = sent.filter((m) => m.type === "state").map((m: any) => m.state);
+    const states = sent
+      .filter((m): m is Extract<ServerMessage, { type: "state" }> => m.type === "state")
+      .map((m) => m.state);
     expect(states).toEqual(["LISTENING", "USER_SPEAKING", "THINKING", "AI_SPEAKING", "LISTENING"]);
     expect(sent.some((m) => m.type === "transcript")).toBe(true);
     expect(sent.some((m) => m.type === "assistant_text")).toBe(true);
@@ -47,7 +49,9 @@ describe("ConversationOrchestrator", () => {
 
     await orchestrator.interrupt();
     expect(orchestrator.state).toBe("LISTENING");
-    const states = sent.filter((m) => m.type === "state").map((m: any) => m.state);
+    const states = sent
+      .filter((m): m is Extract<ServerMessage, { type: "state" }> => m.type === "state")
+      .map((m) => m.state);
     expect(states).toContain("INTERRUPTING");
     vi.useRealTimers();
   });

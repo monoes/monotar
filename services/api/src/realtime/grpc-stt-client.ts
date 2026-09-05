@@ -9,9 +9,17 @@ interface SttServiceClient extends grpc.Client {
   StreamTranscribe(): grpc.ClientDuplexStream<{ pcm16_data: Buffer; sample_rate: number }, { type: string; text: string }>;
 }
 
+interface SttServiceConstructor {
+  new (address: string, credentials: grpc.ChannelCredentials): SttServiceClient;
+}
+
+interface SttServiceDefinition {
+  monotar: { stt: { SttService: SttServiceConstructor } };
+}
+
 function loadSttServiceClient(grpcUrl: string): SttServiceClient {
   const packageDefinition = protoLoader.loadSync(PROTO_PATH, {});
-  const proto = grpc.loadPackageDefinition(packageDefinition) as any;
+  const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as SttServiceDefinition;
   return new proto.monotar.stt.SttService(grpcUrl, grpc.credentials.createInsecure());
 }
 

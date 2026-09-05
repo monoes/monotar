@@ -1,19 +1,33 @@
-import { describe, expect, it, afterAll } from "vitest";
+import { describe, expect, it } from "vitest";
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import path from "node:path";
 import { GrpcSttClient } from "./grpc-stt-client";
 import type { SttEvent } from "./providers";
 
+interface AudioFrameMessage {
+  pcm16_data: Buffer;
+  sample_rate: number;
+}
+
+interface TranscriptEventMessage {
+  type: string;
+  text: string;
+}
+
+interface SttServiceDefinition {
+  monotar: { stt: { SttService: { service: grpc.ServiceDefinition } } };
+}
+
 const PROTO_PATH = path.resolve(__dirname, "../../../../packages/stt-proto/stt.proto");
 
 function startFakeSttServer(): Promise<{ url: string; close: () => void }> {
   const packageDefinition = protoLoader.loadSync(PROTO_PATH, {});
-  const proto = grpc.loadPackageDefinition(packageDefinition) as any;
+  const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as SttServiceDefinition;
 
   const server = new grpc.Server();
   server.addService(proto.monotar.stt.SttService.service, {
-    StreamTranscribe: (call: grpc.ServerDuplexStream<any, any>) => {
+    StreamTranscribe: (call: grpc.ServerDuplexStream<AudioFrameMessage, TranscriptEventMessage>) => {
       let frameCount = 0;
       call.on("data", () => {
         frameCount += 1;
