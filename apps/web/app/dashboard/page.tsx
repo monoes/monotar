@@ -6,7 +6,7 @@ import { AvatarAgentsClient } from "./avatar-agents-client";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 async function fetchMe(): Promise<MeResponse | null> {
-  const cookieHeader = cookies().toString();
+  const cookieHeader = (await cookies()).toString();
   const response = await fetch(`${API_URL}/api/auth/me`, {
     headers: { cookie: cookieHeader },
     cache: "no-store",

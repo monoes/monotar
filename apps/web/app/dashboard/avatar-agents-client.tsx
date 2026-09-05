@@ -13,9 +13,13 @@ export function AvatarAgentsClient() {
   const [error, setError] = useState<string | null>(null);
 
   async function loadAgents() {
-    const response = await fetch(`${API_URL}/api/avatar-agents`, { credentials: "include" });
-    if (response.ok) {
-      setAgents(await response.json());
+    try {
+      const response = await fetch(`${API_URL}/api/avatar-agents`, { credentials: "include" });
+      if (response.ok) {
+        setAgents(await response.json());
+      }
+    } catch {
+      setError("Failed to load agents");
     }
   }
 
@@ -26,19 +30,23 @@ export function AvatarAgentsClient() {
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    const response = await fetch(`${API_URL}/api/avatar-agents`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, systemPrompt, llmConfig: {}, voiceConfig: {} }),
-    });
-    if (!response.ok) {
-      setError(`Failed to create agent (${response.status})`);
-      return;
+    try {
+      const response = await fetch(`${API_URL}/api/avatar-agents`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, systemPrompt, llmConfig: {}, voiceConfig: {} }),
+      });
+      if (!response.ok) {
+        setError(`Failed to create agent (${response.status})`);
+        return;
+      }
+      setName("");
+      setSystemPrompt("");
+      await loadAgents();
+    } catch {
+      setError("Failed to create agent");
     }
-    setName("");
-    setSystemPrompt("");
-    await loadAgents();
   }
 
   return (
