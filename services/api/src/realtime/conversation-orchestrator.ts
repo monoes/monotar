@@ -26,6 +26,7 @@ export class ConversationOrchestrator {
   private llmAbort: AbortController | null = null;
   private ttsAbort: AbortController | null = null;
   private history: ConversationTurn[] = [];
+  private turnEpoch = 0;
 
   constructor(private deps: OrchestratorDeps) {
     this.sttSession = deps.stt.createSession({ sampleRate: 16000 });
@@ -49,10 +50,17 @@ export class ConversationOrchestrator {
   }
 
   private handleSttEvent(event: SttEvent): void {
-    if (event.type === "speech_started" && this.session.state === "LISTENING") {
-      this.setState("USER_SPEAKING");
+    if (event.type === "speech_started") {
+      if (this.session.state === "LISTENING") {
+        this.setState("USER_SPEAKING");
+      } else if (this.session.state === "AI_SPEAKING") {
+        // Barge-in: the user started talking while the assistant was speaking.
+        void this.interrupt();
+      }
+      return;
     }
     if (event.type === "final_transcript" && event.text) {
+      if (this.session.state !== "USER_SPEAKING") return;
       this.deps.send({ type: "transcript", text: event.text });
       this.history.push({ role: "user", content: event.text });
       void this.runTurn();
@@ -67,28 +75,52 @@ export class ConversationOrchestrator {
         yield event.text;
       }
     }
+    if (signal.aborted) return;
     this.history.push({ role: "assistant", content: full });
     this.deps.send({ type: "assistant_text", text: full });
   }
 
   private async runTurn(): Promise<void> {
+    const epoch = ++this.turnEpoch;
     this.setState("THINKING");
-    this.llmAbort = new AbortController();
-    this.ttsAbort = new AbortController();
+    const llmAbort = new AbortController();
+    const ttsAbort = new AbortController();
+    this.llmAbort = llmAbort;
+    this.ttsAbort = ttsAbort;
 
-    const textStream = this.streamAssistantText(this.llmAbort.signal);
-    this.setState("AI_SPEAKING");
-    const avatarSession = await this.avatarSessionPromise;
-    const audioStream = this.deps.tts.synthesizeStream(textStream, {}, this.ttsAbort.signal);
-    await avatarSession.sendAudio(audioStream);
+    try {
+      const textStream = this.streamAssistantText(llmAbort.signal);
+      this.setState("AI_SPEAKING");
+      const avatarSession = await this.avatarSessionPromise;
+      if (epoch !== this.turnEpoch) return;
 
-    if (this.session.state === "AI_SPEAKING") {
-      this.setState("LISTENING");
+      const audioStream = this.deps.tts.synthesizeStream(textStream, {}, ttsAbort.signal);
+      await avatarSession.sendAudio(audioStream);
+      if (epoch !== this.turnEpoch) return;
+
+      if (this.session.state === "AI_SPEAKING") {
+        this.setState("LISTENING");
+      }
+    } catch (error) {
+      if (epoch !== this.turnEpoch) return;
+      const wasAborted =
+        llmAbort.signal.aborted || ttsAbort.signal.aborted || (error instanceof Error && error.name === "AbortError");
+      if (wasAborted) return;
+
+      if (this.session.state !== "ENDED" && this.session.state !== "ERROR") {
+        this.setState("ERROR");
+      }
+      this.deps.send({
+        type: "error",
+        code: "turn_failed",
+        message: error instanceof Error ? error.message : "Unknown error during conversation turn",
+      });
     }
   }
 
   async interrupt(): Promise<void> {
     if (this.session.state !== "AI_SPEAKING") return;
+    this.turnEpoch += 1;
     this.setState("INTERRUPTING");
     this.llmAbort?.abort();
     this.ttsAbort?.abort();
@@ -98,6 +130,7 @@ export class ConversationOrchestrator {
   }
 
   async end(): Promise<void> {
+    this.turnEpoch += 1;
     this.setState("ENDED");
     this.sttSession.close();
     const avatarSession = await this.avatarSessionPromise;

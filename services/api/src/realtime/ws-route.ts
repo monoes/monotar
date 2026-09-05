@@ -12,6 +12,7 @@ export async function realtimeRoutes(app: FastifyInstance): Promise<void> {
     }
 
     let orchestrator: ConversationOrchestrator;
+    let closed = false;
 
     // Deferred two ticks: constructing immediately can land the orchestrator's initial
     // state message in the same TCP read as the client's WS handshake response, which
@@ -23,6 +24,12 @@ export async function realtimeRoutes(app: FastifyInstance): Promise<void> {
         ...buildProviders(),
         send: (message) => socket.send(JSON.stringify(message)),
       });
+      // The socket may have closed during the deferred ticks above, before
+      // `orchestrator` existed for the close handler below to see and clean up.
+      // Without this, that orchestrator's STT/avatar sessions would leak forever.
+      if (closed) {
+        void orchestrator.end();
+      }
     }));
 
     socket.on("message", async (raw: Buffer) => {
@@ -47,6 +54,7 @@ export async function realtimeRoutes(app: FastifyInstance): Promise<void> {
     });
 
     socket.on("close", async () => {
+      closed = true;
       if (orchestrator && orchestrator.state !== "ENDED" && orchestrator.state !== "ERROR") {
         await orchestrator.end();
       }
