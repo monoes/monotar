@@ -78,6 +78,7 @@ model OrganizationMember {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, userId])
+  @@index([userId])
 }
 
 model AvatarAgent {
@@ -93,6 +94,8 @@ model AvatarAgent {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   avatar       Avatar?      @relation(fields: [avatarId], references: [id])
+
+  @@index([organizationId])
 }
 
 enum AvatarStatus {
@@ -112,4 +115,6 @@ model Avatar {
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   avatarAgents AvatarAgent[]
+
+  @@index([organizationId])
 }
