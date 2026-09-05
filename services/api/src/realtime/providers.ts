@@ -1,7 +1,23 @@
-import type { RealtimeState } from "@monotar/contracts";
+export type SttEventType = "speech_started" | "partial_transcript" | "final_transcript" | "speech_ended";
+
+export interface SttEvent {
+  type: SttEventType;
+  text?: string;
+}
+
+export interface SttSessionConfig {
+  sampleRate: number;
+  languageHint?: string;
+}
+
+export interface SttSession {
+  sendAudio(chunk: Buffer): void;
+  onEvent(handler: (event: SttEvent) => void): void;
+  close(): void;
+}
 
 export interface SpeechToTextProvider {
-  transcribe(audioChunk: Buffer): Promise<string>;
+  createSession(config: SttSessionConfig): SttSession;
 }
 
 export interface ConversationTurn {
@@ -9,14 +25,42 @@ export interface ConversationTurn {
   content: string;
 }
 
+export interface LlmRequest {
+  messages: ConversationTurn[];
+}
+
+export type LlmEvent = { type: "token"; text: string } | { type: "done" };
+
 export interface LLMProvider {
-  generateReply(userText: string, history: ConversationTurn[]): AsyncGenerator<string>;
+  streamChat(request: LlmRequest, signal?: AbortSignal): AsyncIterable<LlmEvent>;
+}
+
+export interface VoiceConfig {
+  voiceId?: string;
 }
 
 export interface TextToSpeechProvider {
-  synthesize(text: string): AsyncGenerator<Buffer>;
+  synthesizeStream(
+    text: AsyncIterable<string>,
+    config: VoiceConfig,
+    signal?: AbortSignal
+  ): AsyncIterable<Buffer>;
+}
+
+export type PlaybackState = "idle" | "playing" | "interrupted";
+
+export interface AvatarSessionConfig {
+  avatarId?: string;
+}
+
+export interface AvatarSession {
+  id: string;
+  sendAudio(audio: AsyncIterable<Buffer>): Promise<void>;
+  interrupt(): Promise<void>;
+  getPlaybackState(): Promise<PlaybackState>;
+  close(): Promise<void>;
 }
 
 export interface AvatarEngine {
-  onStateChange(state: RealtimeState): void;
+  createSession(config: AvatarSessionConfig): Promise<AvatarSession>;
 }
