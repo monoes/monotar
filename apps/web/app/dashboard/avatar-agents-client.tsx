@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { AvatarAgent } from "@monotar/contracts";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -46,7 +47,9 @@ export function AvatarAgentsClient() {
       {error && <p role="alert">{error}</p>}
       <ul>
         {agents.map((agent) => (
-          <li key={agent.id}>{agent.name}</li>
+          <li key={agent.id}>
+            {agent.name} — <Link href={`/talk/${agent.id}`}>Talk</Link>
+          </li>
         ))}
       </ul>
       <form onSubmit={handleCreate}>
