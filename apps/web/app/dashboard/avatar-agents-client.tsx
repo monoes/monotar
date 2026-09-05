@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { AvatarAgent } from "@monotar/contracts";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// Must match login/page.tsx's host — the session cookie is scoped to
+// wherever the OAuth callback landed (127.0.0.1, per MONOES_REDIRECT_URI),
+// so a credentialed fetch to a different host silently sends no cookie.
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000";
 
 export function AvatarAgentsClient() {
   const [agents, setAgents] = useState<AvatarAgent[]>([]);
