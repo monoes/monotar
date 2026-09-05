@@ -1,9 +1,15 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { SpeechToTextProvider, SttEvent, SttSession, SttSessionConfig } from "./providers";
 
-const PROTO_PATH = path.resolve(__dirname, "../../../../packages/stt-proto/stt.proto");
+// __dirname doesn't exist in ESM ("type": "module" in package.json) — this
+// module previously crashed the whole process with "ReferenceError:
+// __dirname is not defined" on every load outside of vitest (whose SSR
+// module transform polyfills __dirname, masking this in tests).
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const PROTO_PATH = path.resolve(currentDir, "../../../../packages/stt-proto/stt.proto");
 
 interface SttServiceClient extends grpc.Client {
   StreamTranscribe(): grpc.ClientDuplexStream<{ pcm16_data: Buffer; sample_rate: number }, { type: string; text: string }>;

@@ -1,10 +1,7 @@
 import type { FastifyInstance } from "fastify";
+import { loadRealtimeEnv } from "@monotar/config";
 import { LiveKitSessionManager } from "../realtime/livekit-session-manager";
 import { prisma } from "../db";
-
-function readConfiguredValue(name: string): string | undefined {
-  return process.env[name];
-}
 
 export async function livekitRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/realtime/livekit-token", async (request, reply) => {
@@ -24,14 +21,15 @@ export async function livekitRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(404).send({ error: "not_found" });
     }
 
-    const liveKitId = readConfiguredValue("LIVEKIT_API_KEY");
-    const liveKitSigning = readConfiguredValue("LIVEKIT_API_SECRET");
+    const env = loadRealtimeEnv();
+    const liveKitId = env.livekitApiKey;
+    const liveKitSigning = env.livekitApiSecret;
     if (!liveKitId || !liveKitSigning) {
       return reply.code(500).send({ error: "livekit_not_configured" });
     }
 
     const manager = new LiveKitSessionManager({ apiKey: liveKitId, secretValue: liveKitSigning });
     const token = await manager.createToken(`agent-${agentId}`, request.currentUser.id);
-    return { token, url: readConfiguredValue("LIVEKIT_URL") ?? "ws://localhost:7880" };
+    return { token, url: env.livekitUrl ?? "ws://localhost:7880" };
   });
 }

@@ -29,7 +29,11 @@ export async function avatarRoutes(app: FastifyInstance): Promise<void> {
     if (!canWrite(request.currentUser)) {
       return reply.code(403).send({ error: "forbidden" });
     }
-    const input = CreateAvatarSchema.parse(request.body);
+    const parsedInput = CreateAvatarSchema.safeParse(request.body);
+    if (!parsedInput.success) {
+      return reply.code(400).send({ error: "invalid_body", details: parsedInput.error.issues });
+    }
+    const input = parsedInput.data;
     const orgId = request.currentUser!.organizationId;
     const avatar = await prisma.avatar.create({
       data: { name: input.name, organizationId: orgId, status: "PENDING" },
