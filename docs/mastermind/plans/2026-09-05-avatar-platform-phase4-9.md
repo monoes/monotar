@@ -904,16 +904,19 @@ Add to `docker-compose.yml` (alongside the existing `postgres`, `redis`, `minio`
       --min-port=49160 --max-port=49200
       --realm=monotar.local
       --use-auth-secret
+      --static-auth-secret=$$TURN_SECRET
 ```
 
 `coturn` needs `network_mode: host` because TURN relays media on a wide ephemeral port range that Docker's default bridge networking can't forward cleanly — this is standard practice for self-hosted coturn, not a shortcut.
+
+`--use-auth-secret` alone does not configure a secret — coturn's docker-entrypoint.sh (`eval echo` on each CLI arg) expands `$TURN_SECRET` from the container's own env at startup, so it must be escaped as `$$TURN_SECRET` here (a bare `$TURN_SECRET`/`${TURN_SECRET}` would instead be interpolated by `docker compose` itself from the host environment, which doesn't have it, silently producing an empty secret). Without the `--static-auth-secret=...` flag at all, `--use-auth-secret` runs with no effective secret and `TURN_SECRET` in `.env.local` is never actually used — this was caught and fixed in the Phase 4-9 config-consistency review round.
 
 - [ ] **Step 2: Document the new required credentials**
 
 The user must add these to `.env.example`/`.env.local` themselves (agents cannot touch `.env*` files — this is a hard permission boundary in this project, not a preference):
 - `LIVEKIT_URL` — set to `ws://localhost:7880` for local dev.
-- `LIVEKIT_API_KEY` — any short identifier string works in `--dev` mode (LiveKit's dev mode accepts a fixed key/value pair rather than requiring a production-grade generated one).
-- `LIVEKIT_API_SECRET` — generate a random value at least 32 characters long (e.g. `openssl rand -hex 32`); this is what signs room-access tokens, so it must not be guessable.
+- `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` — read by `services/api` (via `livekit-server-sdk`) to mint room-access tokens. Generate `LIVEKIT_API_SECRET` as a random value at least 32 characters long (e.g. `openssl rand -hex 32`); it must not be guessable.
+- `LIVEKIT_KEYS` — **also required**, set to `"<same value as LIVEKIT_API_KEY>: <same value as LIVEKIT_API_SECRET>"`. The `livekit-server` binary itself never reads `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` (those names only exist as SDK/client conventions) — it only recognizes `LIVEKIT_KEYS` (or a `--config` file's `keys:` map), and in `--dev` mode falls back silently to the hardcoded pair `devkey: secret` when `LIVEKIT_KEYS` is unset. Without this var, `docker-compose.yml`'s `livekit` service (which gets `.env.local` via `env_file:`) keeps validating against `devkey: secret` while `services/api` signs tokens with the real secret, so every LiveKit connection is rejected with an invalid-token error. (Corrected from an earlier, incorrect version of this note that claimed dev mode accepts any key.)
 - `TURN_SECRET` — generate a random value the same way; this authenticates coturn's TURN relay credential requests.
 
 Never write example/placeholder-but-real-looking values for these two secrets into any committed file — describe how to generate them (as above), and let the user's own `.env.local` hold the actual value.
@@ -3070,7 +3073,9 @@ Expected: all tests still pass — this task changes wiring, not behavior, when 
 
 - [ ] **Step 7: Document the new env var**
 
-Add to the note the user needs for `.env.local` (agents cannot write it themselves): `REALTIME_PROVIDER_MODE=mock` for local dev without OpenAI/LiveTalking running, or `REALTIME_PROVIDER_MODE=real` plus `STT_GRPC_URL`, `OPENAI_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LIVETALKING_URL` once those services are actually running (the Post-Plan Manual Verification section below covers exactly this switch-over).
+Add to the note the user needs for `.env.local` (agents cannot write it themselves): `REALTIME_PROVIDER_MODE=mock` for local dev without OpenAI/LiveTalking running, or `REALTIME_PROVIDER_MODE=real` plus `STT_GRPC_URL`, `OPENAI_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `AVATAR_GATEWAY_URL` once those services are actually running (the Post-Plan Manual Verification section below covers exactly this switch-over).
+
+(Corrected in the Phase 4-9 config-consistency review round: the var is `AVATAR_GATEWAY_URL`, not `LIVETALKING_URL` as originally written here — `provider-factory.ts` uses it to construct `AvatarGatewayClient`, which talks to `services/avatar-gateway`'s own `/avatar-sessions` REST API, not to the LiveTalking container directly. `services/avatar-gateway` separately reads its own `LIVETALKING_URL` for the actual LiveTalking backend — reusing the same name for both was a footgun: since both would read the one shared `.env.local` file, setting `LIVETALKING_URL` for `services/api`'s benefit would also silently override `avatar-gateway`'s own LiveTalking connection.)
 
 - [ ] **Step 8: Commit**
 
@@ -3253,7 +3258,7 @@ Claude-Session: https://claude.ai/code/session_01C8F6qQBo2F661HhVVmcm4J"
 None of this plan's automated tests exercise real LiveKit media, real STT/LLM/TTS against live services, or real avatar rendering — that's the explicit, documented CI boundary (Task 19). The real end-to-end check is manual:
 
 1. Run `scripts/fetch-models.sh`, then actually place Wav2Lip weights per its printed instructions.
-2. Add to `.env.local` (user action — agents cannot write this file): `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `TURN_SECRET` (Task 4), `OPENAI_API_KEY`, `LLM_BASE_URL=https://api.openai.com/v1`, `LLM_MODEL` (e.g. `gpt-4o-mini`), `STT_GRPC_URL=127.0.0.1:50051`, `LIVETALKING_URL=http://localhost:4100`, `REALTIME_PROVIDER_MODE=real`.
+2. Add to `.env.local` (user action — agents cannot write this file): `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_KEYS="<LIVEKIT_API_KEY>: <LIVEKIT_API_SECRET>"` (required by the `livekit-server` container itself — see Task 4's corrected note), `TURN_SECRET` (Task 4), `OPENAI_API_KEY`, `LLM_BASE_URL=https://api.openai.com/v1`, `LLM_MODEL` (e.g. `gpt-4o-mini`), `STT_GRPC_URL=127.0.0.1:50051`, `AVATAR_GATEWAY_URL=http://localhost:4100`, `REALTIME_PROVIDER_MODE=real`.
 3. Start infra: `docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d`.
 4. Start `services/stt`: `cd services/stt && python -m stt_service.server` (or via the compose `stt` service).
 5. Start `services/avatar-gateway`: `pnpm --filter @monotar/avatar-gateway dev`.

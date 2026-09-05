@@ -23,7 +23,7 @@ export function buildProviders(): RealtimeProviders {
     return { stt: new MockSTT(), llm: new MockLLM(), tts: new MockTTS(), avatar: new MockAvatarEngine() };
   }
 
-  const requiredEnvVars = ["STT_GRPC_URL", "OPENAI_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "LIVETALKING_URL"];
+  const requiredEnvVars = ["STT_GRPC_URL", "OPENAI_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "AVATAR_GATEWAY_URL"];
   for (const name of requiredEnvVars) {
     if (!readConfiguredValue(name)) {
       throw new Error(`REALTIME_PROVIDER_MODE=real requires ${name} to be set`);
@@ -45,6 +45,6 @@ export function buildProviders(): RealtimeProviders {
       apiKey: openAiId,
       model: readConfiguredValue("TTS_MODEL") ?? "tts-1",
     }),
-    avatar: new AvatarGatewayClient(readConfiguredValue("LIVETALKING_URL") as string, "wav2lip"),
+    avatar: new AvatarGatewayClient(readConfiguredValue("AVATAR_GATEWAY_URL") as string, "wav2lip"),
   };
 }

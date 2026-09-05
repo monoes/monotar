@@ -22,7 +22,7 @@ describe("buildProviders", () => {
     process.env.OPENAI_API_KEY = "test-key";
     process.env.LLM_BASE_URL = "https://api.openai.com/v1";
     process.env.LLM_MODEL = "gpt-4o-mini";
-    process.env.LIVETALKING_URL = "http://localhost:4100";
+    process.env.AVATAR_GATEWAY_URL = "http://localhost:4100";
 
     const providers = buildProviders();
     expect(providers.stt).toBeInstanceOf(GrpcSttClient);

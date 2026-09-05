@@ -40,6 +40,7 @@ services:
       --min-port=49160 --max-port=49200
       --realm=monotar.local
       --use-auth-secret
+      --static-auth-secret=$$TURN_SECRET
 
 volumes:
   pgdata:
