@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ClientMessage } from "@monotar/contracts";
 import { ClientMessageSchema } from "@monotar/contracts";
 import { ConversationOrchestrator } from "./conversation-orchestrator";
-import { MockSTT, MockLLM, MockTTS, MockAvatarEngine } from "./mock-providers";
+import { buildProviders } from "./provider-factory";
 
 export async function realtimeRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/realtime/:agentId", { websocket: true }, (socket, request) => {
@@ -20,10 +20,7 @@ export async function realtimeRoutes(app: FastifyInstance): Promise<void> {
     // continuation attached from an "open" listener).
     setImmediate(() => setImmediate(() => {
       orchestrator = new ConversationOrchestrator({
-        stt: new MockSTT(),
-        llm: new MockLLM(),
-        tts: new MockTTS(),
-        avatar: new MockAvatarEngine(),
+        ...buildProviders(),
         send: (message) => socket.send(JSON.stringify(message)),
       });
     }));
