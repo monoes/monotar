@@ -11,6 +11,8 @@
     "db:generate": "prisma generate"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.12.2",
+    "@grpc/proto-loader": "^0.7.13",
     "fastify": "^5.1.0",
     "@fastify/cookie": "^11.0.1",
     "@fastify/cors": "^10.0.1",
