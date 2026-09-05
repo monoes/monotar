@@ -24,6 +24,23 @@ services:
     ports: ["9000:9000", "9001:9001"]
     volumes: ["minio-data:/data"]
 
+  livekit:
+    image: livekit/livekit-server:v1.7.2
+    command: --dev --bind 0.0.0.0
+    env_file: .env.local
+    ports: ["7880:7880", "7881:7881", "7882:7882/udp"]
+
+  coturn:
+    image: coturn/coturn:4.6.2
+    env_file: .env.local
+    network_mode: host
+    command: >
+      -n --log-file=stdout
+      --listening-port=3478
+      --min-port=49160 --max-port=49200
+      --realm=monotar.local
+      --use-auth-secret
+
 volumes:
   pgdata:
   minio-data:
