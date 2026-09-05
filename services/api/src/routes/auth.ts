@@ -13,10 +13,27 @@ interface MonoesOAuthResponse {
   expires_in: number;
 }
 
-function decodeIdTokenPayload(idToken: string): { sub: string; email: string } {
+interface MonoesUserInfo {
+  sub: string;
+  email: string;
+  name?: string;
+  picture?: string;
+}
+
+function decodeIdTokenSubject(idToken: string): string {
   const [, payload] = idToken.split(".");
   const json = Buffer.from(payload, "base64url").toString("utf-8");
-  return JSON.parse(json) as { sub: string; email: string };
+  return (JSON.parse(json) as { sub: string }).sub;
+}
+
+async function fetchMonoesUserInfo(monoesIssuer: string, accessToken: string): Promise<MonoesUserInfo> {
+  const response = await fetch(`${monoesIssuer}/oauth2/userinfo`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    throw new Error(`MonoES userinfo request failed with status ${response.status}`);
+  }
+  return (await response.json()) as MonoesUserInfo;
 }
 
 function hashSessionValue(value: string): string {
@@ -95,7 +112,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const oauthResponse = (await exchangeResponse.json()) as MonoesOAuthResponse;
-    const { sub, email } = decodeIdTokenPayload(oauthResponse.id_token);
+    const sub = decodeIdTokenSubject(oauthResponse.id_token);
+    // MonoES's id_token carries only auth/identity claims (sub, iss, aud, timing) —
+    // profile fields (email, name, picture) must be fetched from userinfo separately.
+    const userInfo = await fetchMonoesUserInfo(env.monoesIssuer, oauthResponse.access_token);
+    const { email, name: displayName, picture: avatarUrl } = userInfo;
 
     const existingIdentity = await prisma.externalIdentity.findUnique({
       where: { provider_providerSubject: { provider: "monoes", providerSubject: sub } },
@@ -107,11 +128,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       userId = existingIdentity.userId;
       await prisma.user.update({
         where: { id: userId },
-        data: { email, lastLoginAt: new Date() },
+        data: { email, displayName, avatarUrl, lastLoginAt: new Date() },
       });
     } else {
       const user = await prisma.user.create({
-        data: { email, lastLoginAt: new Date() },
+        data: { email, displayName, avatarUrl, lastLoginAt: new Date() },
       });
       userId = user.id;
       await prisma.externalIdentity.create({

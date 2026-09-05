@@ -7,8 +7,9 @@ export interface MockMonoesServer {
   close: () => Promise<void>;
 }
 
-function fakeIdToken(subject: string, email: string): string {
-  const payload = Buffer.from(JSON.stringify({ sub: subject, email })).toString("base64url");
+function fakeIdToken(subject: string): string {
+  // Matches real MonoES: the id_token carries only auth/identity claims, not email.
+  const payload = Buffer.from(JSON.stringify({ sub: subject })).toString("base64url");
   return `header.${payload}.signature`;
 }
 
@@ -37,12 +38,17 @@ export async function startMockMonoesServer(): Promise<MockMonoesServer> {
         res.end(
           JSON.stringify({
             access_token: generateTestOpaqueValue(),
-            id_token: fakeIdToken("test-subject", "user@example.com"),
+            id_token: fakeIdToken("test-subject"),
             token_type: "Bearer",
             expires_in: 3600,
           })
         );
       });
+      return;
+    }
+    if (url.pathname === "/oauth2/userinfo" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ sub: "test-subject", email: "user@example.com" }));
       return;
     }
     res.writeHead(404);
