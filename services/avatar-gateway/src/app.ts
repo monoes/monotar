@@ -1,7 +1,8 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { avatarSessionRoutes, type AvatarSessionsConfig } from "./routes/avatar-sessions";
 
-export function buildApp(): FastifyInstance {
+export function buildApp(config: AvatarSessionsConfig): FastifyInstance {
   const app = Fastify({ logger: true });
-  app.get("/health", async () => ({ status: "ok" }));
+  app.register(avatarSessionRoutes, config);
   return app;
 }
