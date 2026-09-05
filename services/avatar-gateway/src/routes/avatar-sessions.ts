@@ -48,8 +48,14 @@ export async function avatarSessionRoutes(app: FastifyInstance, config: AvatarSe
     const { id } = request.params as { id: string };
     const session = sessions.get(id);
     if (!session) return reply.code(404).send({ error: "not_found" });
-    await session.close();
-    sessions.delete(id);
+    try {
+      await session.close();
+    } finally {
+      // Always drop the local entry, even if the upstream close failed:
+      // otherwise a session that fails to close cleanly is stuck in this map
+      // forever, and every future DELETE for the same id keeps failing.
+      sessions.delete(id);
+    }
     return reply.code(204).send();
   });
 

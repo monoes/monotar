@@ -43,13 +43,28 @@ export async function realtimeRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
 
-      if (parsed.type === "interrupt") {
-        await orchestrator.interrupt();
-        return;
-      }
-      if (parsed.type === "end") {
-        await orchestrator.end();
-        socket.close(1000, "ended");
+      try {
+        if (parsed.type === "interrupt") {
+          await orchestrator.interrupt();
+          return;
+        }
+        if (parsed.type === "end") {
+          await orchestrator.end();
+          socket.close(1000, "ended");
+        }
+      } catch (error) {
+        // orchestrator.interrupt()/end() can reject (e.g. the avatar-gateway
+        // request they await fails). Left uncaught, this listener's rejected
+        // promise becomes an unhandled promise rejection, which by default
+        // crashes the whole Node process -- taking down every other active
+        // realtime session, not just this one.
+        socket.send(
+          JSON.stringify({
+            type: "error",
+            code: "command_failed",
+            message: error instanceof Error ? error.message : "Failed to process message",
+          }),
+        );
       }
     });
 

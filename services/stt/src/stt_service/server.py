@@ -41,6 +41,15 @@ class SttServicer(stt_pb2_grpc.SttServiceServicer):
                 yield stt_pb2.TranscriptEvent(type="final_transcript", text=text)
                 yield stt_pb2.TranscriptEvent(type="speech_ended")
 
+        # The client stream can end (disconnect, call hangup) while the user is
+        # still mid-utterance, i.e. before a trailing silence frame ever arrives
+        # to trigger the block above. Without this, that last utterance's audio
+        # is silently discarded and no final_transcript is ever emitted for it.
+        if speaking:
+            text = self._transcriber.transcribe(bytes(buffered_audio), frame.sample_rate)
+            yield stt_pb2.TranscriptEvent(type="final_transcript", text=text)
+            yield stt_pb2.TranscriptEvent(type="speech_ended")
+
 
 def serve(port: int = 50051) -> grpc.Server:
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

@@ -11,6 +11,7 @@ export function TalkClient({ agentId }: { agentId: string }) {
   const [state, setState] = useState<RealtimeState>("CREATED");
   const [transcript, setTranscript] = useState("");
   const [assistantText, setAssistantText] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlWsRef = useRef<WebSocket | null>(null);
   const roomRef = useRef<Room | null>(null);
@@ -23,18 +24,37 @@ export function TalkClient({ agentId }: { agentId: string }) {
   }, []);
 
   async function startTalking() {
+    // Guard against a second click (or a retry after a failed attempt) while a
+    // previous session is still live: without this, the old WebSocket/Room are
+    // simply overwritten in the refs and leak (never closed/disconnected),
+    // leaving a stale connection open for the rest of the page's lifetime.
+    controlWsRef.current?.close();
+    roomRef.current?.disconnect();
+    setErrorMessage(null);
+
     const controlWs = new WebSocket(`${WS_URL}/api/realtime/${agentId}`);
     controlWsRef.current = controlWs;
     controlWs.onmessage = (event) => {
-      const message: ServerMessage = JSON.parse(event.data);
+      let message: ServerMessage;
+      try {
+        message = JSON.parse(event.data);
+      } catch {
+        return;
+      }
       if (message.type === "state") setState(message.state);
       if (message.type === "transcript") setTranscript(message.text);
       if (message.type === "assistant_text") setAssistantText(message.text);
+      if (message.type === "error") setErrorMessage(message.message);
     };
 
     const tokenResponse = await fetch(`${API_URL}/api/realtime/livekit-token?agentId=${agentId}`, {
       credentials: "include",
     });
+    if (!tokenResponse.ok) {
+      setErrorMessage(`Failed to get LiveKit token (status ${tokenResponse.status})`);
+      controlWs.close();
+      return;
+    }
     const { token, url } = await tokenResponse.json();
 
     const room = new Room();
@@ -53,7 +73,9 @@ export function TalkClient({ agentId }: { agentId: string }) {
   }
 
   function sendInterrupt() {
-    controlWsRef.current?.send(JSON.stringify({ type: "interrupt" }));
+    if (controlWsRef.current?.readyState === WebSocket.OPEN) {
+      controlWsRef.current.send(JSON.stringify({ type: "interrupt" }));
+    }
   }
 
   return (
@@ -64,6 +86,7 @@ export function TalkClient({ agentId }: { agentId: string }) {
       <button onClick={sendInterrupt}>Interrupt</button>
       <p>Transcript: {transcript}</p>
       <p>Assistant: {assistantText}</p>
+      {errorMessage && <p data-testid="error-message">Error: {errorMessage}</p>}
     </div>
   );
 }
