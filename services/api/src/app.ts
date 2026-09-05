@@ -9,6 +9,7 @@ import { avatarAgentRoutes } from "./routes/avatar-agents";
 import { avatarRoutes } from "./routes/avatars";
 import { sessionPlugin } from "./plugins/session";
 import { realtimeRoutes } from "./realtime/ws-route";
+import { livekitRoutes } from "./routes/livekit";
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({ logger: true });
@@ -26,5 +27,6 @@ export function buildApp(): FastifyInstance {
   app.register(avatarAgentRoutes);
   app.register(avatarRoutes);
   app.register(realtimeRoutes);
+  app.register(livekitRoutes);
   return app;
 }

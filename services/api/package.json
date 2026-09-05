@@ -19,7 +19,8 @@
     "@monotar/contracts": "workspace:*",
     "@monotar/auth": "workspace:*",
     "@prisma/client": "^5.21.1",
-    "fastify-plugin": "^5.0.1"
+    "fastify-plugin": "^5.0.1",
+    "livekit-server-sdk": "^2.9.2"
   },
   "devDependencies": {
     "tsx": "^4.19.1",
