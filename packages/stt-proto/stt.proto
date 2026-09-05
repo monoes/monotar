@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package monotar.stt;
+
+service SttService {
+  rpc StreamTranscribe(stream AudioFrame) returns (stream TranscriptEvent);
+}
+
+message AudioFrame {
+  bytes pcm16_data = 1;
+  int32 sample_rate = 2;
+}
+
+message TranscriptEvent {
+  string type = 1; // "speech_started" | "partial_transcript" | "final_transcript" | "speech_ended"
+  string text = 2;
+}
