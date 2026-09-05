@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { LiveKitSessionManager } from "../realtime/livekit-session-manager";
+import { prisma } from "../db";
 
 function readConfiguredValue(name: string): string | undefined {
   return process.env[name];
@@ -14,6 +15,13 @@ export async function livekitRoutes(app: FastifyInstance): Promise<void> {
     const { agentId } = request.query as { agentId?: string };
     if (!agentId) {
       return reply.code(400).send({ error: "missing_agent_id" });
+    }
+
+    const agent = await prisma.avatarAgent.findFirst({
+      where: { id: agentId, organizationId: request.currentUser.organizationId },
+    });
+    if (!agent) {
+      return reply.code(404).send({ error: "not_found" });
     }
 
     const liveKitId = readConfiguredValue("LIVEKIT_API_KEY");
