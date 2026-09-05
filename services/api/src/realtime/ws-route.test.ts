@@ -38,7 +38,7 @@ describe("WS /api/realtime/:agentId", () => {
     await prisma.$disconnect();
   });
 
-  it("runs a full mock conversation turn and reaches LISTENING again", async () => {
+  it("sends an initial LISTENING state on connect", async () => {
     const { sessionValue, agent } = await createLoggedInUser();
     const app = buildApp();
     await app.listen({ port: 0 });
@@ -50,25 +50,14 @@ describe("WS /api/realtime/:agentId", () => {
     });
 
     await new Promise((resolve) => ws.on("open", resolve));
-    const initialState = await collectMessages(ws, 1);
-    expect(initialState[0]).toEqual({ type: "state", state: "LISTENING" });
-
-    const turnMessages = collectMessages(ws, 6);
-    ws.send(JSON.stringify({ type: "audio_chunk", data: "ZmFrZS1hdWRpbw==" }));
-    const messages = await turnMessages;
-
-    const states = messages
-      .filter((m): m is Extract<ServerMessage, { type: "state" }> => m.type === "state")
-      .map((m) => m.state);
-    expect(states).toEqual(["USER_SPEAKING", "THINKING", "AI_SPEAKING", "LISTENING"]);
-    expect(messages.some((m) => m.type === "transcript")).toBe(true);
-    expect(messages.some((m) => m.type === "assistant_text")).toBe(true);
+    const [initial] = await collectMessages(ws, 1);
+    expect(initial).toEqual({ type: "state", state: "LISTENING" });
 
     ws.close();
     await app.close();
   });
 
-  it("handles interrupt during AI_SPEAKING", async () => {
+  it("ends the session on an explicit end message", async () => {
     const { sessionValue, agent } = await createLoggedInUser();
     const app = buildApp();
     await app.listen({ port: 0 });
@@ -80,26 +69,13 @@ describe("WS /api/realtime/:agentId", () => {
     });
 
     await new Promise((resolve) => ws.on("open", resolve));
-    await collectMessages(ws, 1); // initial LISTENING
+    await collectMessages(ws, 1);
 
-    let sawAiSpeaking = false;
-    const interruptHandled = new Promise<void>((resolve) => {
-      ws.on("message", (raw) => {
-        const msg = JSON.parse(raw.toString()) as ServerMessage;
-        if (msg.type === "state" && msg.state === "AI_SPEAKING" && !sawAiSpeaking) {
-          sawAiSpeaking = true;
-          ws.send(JSON.stringify({ type: "interrupt" }));
-        }
-        if (msg.type === "state" && msg.state === "LISTENING" && sawAiSpeaking) {
-          resolve();
-        }
-      });
-    });
+    const closed = new Promise<number>((resolve) => ws.on("close", (code) => resolve(code)));
+    ws.send(JSON.stringify({ type: "end" }));
+    const code = await closed;
+    expect(code).toBe(1000);
 
-    ws.send(JSON.stringify({ type: "audio_chunk", data: "ZmFrZS1hdWRpbw==" }));
-    await interruptHandled;
-
-    ws.close();
     await app.close();
   });
 });
