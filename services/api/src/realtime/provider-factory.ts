@@ -43,7 +43,7 @@ export function buildProviders(): RealtimeProviders {
     tts: new OpenAITTSProvider({
       baseUrl: llmBaseUrl,
       apiKey: openAiId,
-      model: "tts-1",
+      model: readConfiguredValue("TTS_MODEL") ?? "tts-1",
     }),
     avatar: new AvatarGatewayClient(readConfiguredValue("LIVETALKING_URL") as string, "wav2lip"),
   };

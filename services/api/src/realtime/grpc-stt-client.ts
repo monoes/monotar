@@ -17,10 +17,23 @@ interface SttServiceDefinition {
   monotar: { stt: { SttService: SttServiceConstructor } };
 }
 
+// Loaded once per process: proto parsing/reflection is pure I/O + CPU work that
+// doesn't depend on the target address, so there's no reason to redo it for
+// every session.
+let cachedServiceConstructor: SttServiceConstructor | null = null;
+
+function getSttServiceConstructor(): SttServiceConstructor {
+  if (!cachedServiceConstructor) {
+    const packageDefinition = protoLoader.loadSync(PROTO_PATH, {});
+    const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as SttServiceDefinition;
+    cachedServiceConstructor = proto.monotar.stt.SttService;
+  }
+  return cachedServiceConstructor;
+}
+
 function loadSttServiceClient(grpcUrl: string): SttServiceClient {
-  const packageDefinition = protoLoader.loadSync(PROTO_PATH, {});
-  const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as SttServiceDefinition;
-  return new proto.monotar.stt.SttService(grpcUrl, grpc.credentials.createInsecure());
+  const SttService = getSttServiceConstructor();
+  return new SttService(grpcUrl, grpc.credentials.createInsecure());
 }
 
 export class GrpcSttClient implements SpeechToTextProvider {
@@ -34,7 +47,12 @@ export class GrpcSttClient implements SpeechToTextProvider {
     stream.on("data", (message: { type: string; text: string }) => {
       handler?.({ type: message.type as SttEvent["type"], text: message.text || undefined });
     });
-    stream.on("error", () => {});
+    stream.on("error", (err: Error) => {
+      // Not a reconnect strategy — just making a previously-silent failure
+      // observable. A dropped STT stream currently has no recovery path;
+      // the session is effectively dead until the client tears it down.
+      console.error("[GrpcSttClient] STT stream error:", err);
+    });
 
     return {
       sendAudio(chunk: Buffer) {
