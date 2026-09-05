@@ -24,7 +24,7 @@ let cachedServiceConstructor: SttServiceConstructor | null = null;
 
 function getSttServiceConstructor(): SttServiceConstructor {
   if (!cachedServiceConstructor) {
-    const packageDefinition = protoLoader.loadSync(PROTO_PATH, {});
+    const packageDefinition = protoLoader.loadSync(PROTO_PATH, { keepCase: true });
     const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as SttServiceDefinition;
     cachedServiceConstructor = proto.monotar.stt.SttService;
   }

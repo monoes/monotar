@@ -22,16 +22,22 @@ export class AvatarGatewayClient implements AvatarEngine {
       async sendAudio(audio: AsyncIterable<Buffer>) {
         playback = "playing";
         for await (const chunk of audio) {
-          await fetch(`${baseUrl}/avatar-sessions/${id}/audio`, {
+          const response = await fetch(`${baseUrl}/avatar-sessions/${id}/audio`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ audioBase64: chunk.toString("base64") }),
           });
+          if (!response.ok) {
+            throw new Error(`avatar-gateway sendAudio failed with status ${response.status}`);
+          }
         }
         if (playback === "playing") playback = "idle";
       },
       async interrupt() {
-        await fetch(`${baseUrl}/avatar-sessions/${id}/interrupt`, { method: "POST" });
+        const response = await fetch(`${baseUrl}/avatar-sessions/${id}/interrupt`, { method: "POST" });
+        if (!response.ok) {
+          throw new Error(`avatar-gateway interrupt failed with status ${response.status}`);
+        }
         playback = "interrupted";
       },
       async getPlaybackState() {

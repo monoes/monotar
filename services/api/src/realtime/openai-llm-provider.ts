@@ -34,17 +34,30 @@ export class OpenAILLMProvider implements LLMProvider {
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
-      const lines = buffer.split("\n\n");
-      buffer = lines.pop() ?? "";
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
 
-      for (const line of lines) {
-        const trimmed = line.replace(/^data: /, "").trim();
+      for (const event of events) {
+        const dataLines = event
+          .split("\n")
+          .filter((l) => l.startsWith("data:"))
+          .map((l) => l.replace(/^data:\s?/, ""));
+        if (dataLines.length === 0) continue;
+        const trimmed = dataLines.join("\n").trim();
         if (!trimmed) continue;
         if (trimmed === "[DONE]") {
           yield { type: "done" };
           return;
         }
-        const parsed = JSON.parse(trimmed) as { choices: { delta: { content?: string } }[] };
+        let parsed: { choices: { delta: { content?: string } }[] };
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch {
+          // Non-JSON or malformed SSE payload (e.g. a stray comment/keep-alive
+          // line from a proxy or an OpenAI-compatible gateway) — skip it
+          // instead of killing the whole stream.
+          continue;
+        }
         const text = parsed.choices[0]?.delta?.content;
         if (text) {
           yield { type: "token", text };
