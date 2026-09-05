@@ -1,0 +1,9 @@
+[submodule "external/LiveTalking"]
+	path = external/LiveTalking
+	url = https://github.com/lipku/LiveTalking.git
+[submodule "external/MuseTalk"]
+	path = external/MuseTalk
+	url = https://github.com/TMElyralab/MuseTalk.git
+[submodule "external/Wav2Lip"]
+	path = external/Wav2Lip
+	url = https://github.com/Rudrabha/Wav2Lip.git
