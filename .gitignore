@@ -10,3 +10,4 @@ __pycache__/
 .turbo/
 coverage/
 services/stt/src/stt_service/generated/
+models/
