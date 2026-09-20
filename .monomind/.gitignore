@@ -12,3 +12,5 @@ daemon.pid
 *.token
 *.secret
 .env
+dashboard-token
+dashboard-token-*
